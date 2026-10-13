@@ -44,7 +44,8 @@ export class DeliveryWorker {
           const result = validateEvidence(job.kind, operation.result, job.payload.specification.acceptanceCriteria.length);
           this.store.finish(job.id, token, result);
         } else if (operation.status === 'failed') {
-          this.store.fail(job.id, token, 'RUNTIME_TASK_FAILED', { retryable: operation.retryable === true, clearCheckpoint: operation.retryable === true });
+          const code = typeof operation.error === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(operation.error) ? operation.error : 'RUNTIME_TASK_FAILED';
+          this.store.fail(job.id, token, code, { retryable: operation.retryable === true, clearCheckpoint: operation.retryable === true });
         } else throw new AppError(502, 'INVALID_RUNTIME_RESPONSE', 'Unknown runtime operation state');
       }
     } catch (error) {
