@@ -3,7 +3,7 @@
 Discuss an idea with the owner, freeze an approved specification, then execute design, implementation, review, testing and deployment. Support multiple projects with separate repositories and execution environments.
 
 ## Current status
-The platform has a dependency-free Node.js planning API with SQLite project memory, a Responses API planner adapter, versioned drafts and explicit approval gates. The TypeScript workflow demo remains illustrative. Background delivery jobs, Jira/GitHub runtime adapters and application deployment are not implemented. See docs/planning-api.md for setup and limits.
+The platform has a dependency-free Node.js planning API with SQLite project memory, a Responses API planner adapter, versioned drafts and explicit approval gates. Delivery runs now support manager task decomposition, leased background workers, dependency scheduling and remote-runtime checkpoints. The runtime HTTP adapter is implemented; the actual coding execution service and application deployment are not. The TypeScript workflow demo remains illustrative. See docs/planning-api.md and docs/delivery-runtime.md for setup and limits.
 
 ## Roles
 Planner: gather requirements, assumptions, exceptions and acceptance criteria.
@@ -34,7 +34,7 @@ Evidence must come from tools/CI; the workflow demo's booleans are illustrative,
 ## Next implementation
 1. Deploy/configure the planning backend and verify live model access.
 2. PostgreSQL migration, durable model jobs, idempotency and spending reservations.
-3. Manager orchestration, task scheduling and durable execution checkpoints.
-4. Isolated coding worker and GitHub adapter.
+3. Configure and verify manager model access; add automatic remediation and runtime usage accounting.
+4. Implement/deploy the isolated coding runtime service and GitHub adapter.
 5. Design/review/browser QA tools.
 6. CI/CD release adapter and mobile ChatGPT integration.
