@@ -1,0 +1,12 @@
+{
+  "owner/application-repo": {
+    "path": "/srv/application-repos/application-repo",
+    "baseRef": "main",
+    "acceptanceChecks": [
+      {
+        "criterion": "Replace with the exact approved acceptance criterion",
+        "argv": ["node", "--test", "test/booking.test.mjs"]
+      }
+    ]
+  }
+}
