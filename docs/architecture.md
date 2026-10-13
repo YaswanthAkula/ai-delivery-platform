@@ -3,7 +3,7 @@
 Discuss an idea with the owner, freeze an approved specification, then execute design, implementation, review, testing and deployment. Support multiple projects with separate repositories and execution environments.
 
 ## Current status
-The platform has a dependency-free Node.js planning API with SQLite project memory, a Responses API planner adapter, versioned drafts and explicit approval gates. Delivery runs now support manager task decomposition, leased background workers, dependency scheduling and remote-runtime checkpoints. The runtime HTTP adapter is implemented; the actual coding execution service and application deployment are not. The TypeScript workflow demo remains illustrative. See docs/planning-api.md and docs/delivery-runtime.md for setup and limits.
+The platform has a dependency-free Node.js planning API with SQLite project memory, a Responses API planner adapter, versioned drafts and explicit approval gates. Delivery runs support manager task decomposition, leased workers, dependency scheduling and remote checkpoints. The coding runtime service implements Codex CLI execution in separate Git clones/branches, design/coding/review artifacts and command-backed QA. Model authentication/cloud hosting are not configured; application deployment is not implemented. The TypeScript workflow demo remains illustrative. See docs/planning-api.md, docs/delivery-runtime.md and docs/codex-runtime.md for setup and limits.
 
 ## Roles
 Planner: gather requirements, assumptions, exceptions and acceptance criteria.
@@ -35,6 +35,6 @@ Evidence must come from tools/CI; the workflow demo's booleans are illustrative,
 1. Deploy/configure the planning backend and verify live model access.
 2. PostgreSQL migration, durable model jobs, idempotency and spending reservations.
 3. Configure and verify manager model access; add automatic remediation and runtime usage accounting.
-4. Implement/deploy the isolated coding runtime service and GitHub adapter.
+4. Deploy/configure the coding runtime service and add GitHub publishing/PR integration.
 5. Design/review/browser QA tools.
 6. CI/CD release adapter and mobile ChatGPT integration.
