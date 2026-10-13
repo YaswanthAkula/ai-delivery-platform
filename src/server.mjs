@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { Memory, AppError, requireText } from './memory.mjs';
 import { createPlanner } from './planner.mjs';
+import { DeliveryStore } from './delivery-store.mjs';
 
 function positiveInteger(value, fallback, name) {
   const number = Number(value ?? fallback);
@@ -27,7 +28,7 @@ async function body(req) {
     return value;
   } catch { throw new AppError(400, 'INVALID_JSON', 'Body must be a JSON object'); }
 }
-export function createApp({ memory, planner, token, maxPlanningTurns = 100 }) {
+export function createApp({ memory, planner, token, maxPlanningTurns = 100, delivery = new DeliveryStore(memory) }) {
   if (!token || token.length < 32) throw new Error('APP_AUTH_TOKEN must contain at least 32 characters');
   const locks = new Set();
   const server = createServer(async (req, res) => {
@@ -43,19 +44,22 @@ export function createApp({ memory, planner, token, maxPlanningTurns = 100 }) {
         if (req.method === 'GET') return send(200, { projects: memory.list() });
         if (req.method === 'POST') { const value = await body(req); return send(201, memory.create(value.name, value.idea)); }
       }
-      const match = pathname.match(/^\/projects\/([a-f0-9-]+)(?:\/(messages|specifications|approve))?$/);
+      const match = pathname.match(/^\/projects\/([a-f0-9-]+)(?:\/(messages|specifications|approve|delivery|delivery\/resume))?$/);
       if (!match) throw new AppError(404, 'NOT_FOUND', 'Route not found');
       const [, id, action] = match;
       let project = memory.project(id);
       if (!action && req.method === 'GET') return send(200, { ...project, usage: memory.tokens(id), specifications: memory.specs(id) });
       if (action === 'messages' && req.method === 'GET') return send(200, { messages: memory.history(id) });
       if (action === 'specifications' && req.method === 'GET') return send(200, { specifications: memory.specs(id) });
+      if (action === 'delivery' && req.method === 'GET') return send(200, { runs: delivery.forProject(id) });
       if (req.method !== 'POST') throw new AppError(404, 'NOT_FOUND', 'Route not found');
       const value = await body(req);
       project = memory.project(id);
       if (locks.has(id)) throw new AppError(409, 'PROJECT_BUSY', 'A planning turn is already running');
       if (action === 'specifications') return send(201, memory.saveSpec(id, value));
       if (action === 'approve') return send(200, memory.approve(id, value.version, value.expectedRevision, value.acknowledgeAssumptions));
+      if (action === 'delivery') return send(202, delivery.start(id, value));
+      if (action === 'delivery/resume') return send(200, delivery.resume(id, value.runId));
       if (action !== 'messages') throw new AppError(404, 'NOT_FOUND', 'Route not found');
       if (project.stage !== 'planning') throw new AppError(409, 'PLAN_FROZEN', 'Approved project cannot be replanned without a change request');
       const input = requireText(value.content, 'content');
