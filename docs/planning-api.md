@@ -3,7 +3,7 @@
 ## Status and startup
 
 Implemented: single-owner authenticated HTTP API, SQLite project memory, versioned drafts, explicit approval, Responses API planner adapter and token usage records.
-Not implemented: public mobile UI/ChatGPT integration, delivery manager, workers, code execution or application deployment. Approval marks a project ready; it does not start coding yet.
+Public mobile UI/ChatGPT integration, code execution and application deployment remain unimplemented. A delivery manager and background scheduler are now available; see docs/delivery-runtime.md. Approval marks a project ready; delivery enqueue is a separate API operation and requires a configured runtime for actual execution.
 
 Requires Node.js 24+. There are no npm dependencies. Set APP_AUTH_TOKEN (a random secret of at least 32 characters), OPENAI_API_KEY and PLANNER_MODEL in backend secrets. Do not paste secrets into chat or commit them. The model must support the Responses API and be available to the account; no model is silently substituted.
 
