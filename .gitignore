@@ -8,3 +8,6 @@ data/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+runtime-data/
+*.sqlite.lock
+runtime-repositories.json
