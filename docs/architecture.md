@@ -3,7 +3,7 @@
 Discuss an idea with the owner, freeze an approved specification, then execute design, implementation, review, testing and deployment. Support multiple projects with separate repositories and execution environments.
 
 ## Current status
-This commit is a dependency-free TypeScript foundation with a local workflow demonstration. It does not call models, run background jobs, connect Jira/GitHub, or deploy applications.
+The platform has a dependency-free Node.js planning API with SQLite project memory, a Responses API planner adapter, versioned drafts and explicit approval gates. The TypeScript workflow demo remains illustrative. Background delivery jobs, Jira/GitHub runtime adapters and application deployment are not implemented. See docs/planning-api.md for setup and limits.
 
 ## Roles
 Planner: gather requirements, assumptions, exceptions and acceptance criteria.
@@ -16,7 +16,7 @@ Release: deploy using configured credentials, run smoke checks and record delive
 
 ## Runtime design
 Mobile chat -> authenticated backend -> project/specification storage -> durable execution queue -> manager -> specialist workers.
-Use PostgreSQL for specifications, tasks, approvals, checkpoints and usage records.
+Initial single-server planning memory uses SQLite on a persistent disk. PostgreSQL is the target for specifications, tasks, approvals, checkpoints and usage records when distributed delivery workers are added.
 A durable queue/worker must resume after process restart. Model conversations alone are not durable execution.
 Evaluate OpenAI Agents SDK for orchestration and managed Agents API access for coding environments before choosing adapters.
 GitHub adapter manages separate application repositories. Jira is optional; platform tasks remain authoritative.
@@ -32,9 +32,9 @@ Errors must be persisted with bounded retry counts. Missing access or exhausted 
 Evidence must come from tools/CI; the workflow demo's booleans are illustrative, not trusted production checks.
 
 ## Next implementation
-1. Backend authentication and project/specification APIs.
-2. PostgreSQL persistence and durable jobs.
-3. Planner/manager model integration with usage accounting.
+1. Deploy/configure the planning backend and verify live model access.
+2. PostgreSQL migration, durable model jobs, idempotency and spending reservations.
+3. Manager orchestration, task scheduling and durable execution checkpoints.
 4. Isolated coding worker and GitHub adapter.
 5. Design/review/browser QA tools.
 6. CI/CD release adapter and mobile ChatGPT integration.
