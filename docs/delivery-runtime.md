@@ -4,7 +4,7 @@
 
 Implemented: durable SQLite delivery runs/jobs, model-backed task decomposition, mandatory stage gates, dependency scheduling, leased background workers, checkpoint recovery, bounded dispatch/retry counts and an authenticated HTTP adapter for a separate coding runtime.
 
-Not implemented in this milestone: the coding runtime server itself, Codex installation/authentication, repository provisioning, actual code execution, browser QA, CI/CD release adapters or a deployed service. The HTTP protocol below is our integration contract, not an existing OpenAI endpoint. Queue tests inject a fake runtime and do not prove live coding or deployment.
+The coding runtime server is now implemented (see docs/codex-runtime.md): allowlisted source repositories, separate Git clones/branches, Codex CLI invocation, persistent evidence and trusted acceptance commands. Codex installation/authentication, cloud hosting, browser-specific QA, automatic remediation and CI/CD release adapters remain unconfigured/unimplemented. The HTTP protocol below is our integration contract, not an OpenAI endpoint. Tests exercise the real service and temporary Git repositories with injected Codex responses; live model execution/deployment has not been verified.
 
 ## Start and observe delivery
 
@@ -84,7 +84,7 @@ Every URL must be HTTPS. Runtime evidence artifacts must be stored persistently,
 
 ## Next runtime implementation
 
-Build the trusted runtime service using isolated Codex environments. Codex can be controlled programmatically with its SDK or non-interactive CLI. Add repository/branch provisioning, persisted operation IDs, trace artifacts, independent tests and CI/CD release verification.
+Deploy/configure the implemented runtime service using an isolated host (docs/codex-runtime.md). Verify live Codex access, add GitHub publishing, automatic repair, browser tooling and a separate CI/CD release adapter. The current service returns RELEASE_ADAPTER_MISSING rather than attempting deployment.
 
 Official references:
 - https://learn.chatgpt.com/docs/codex-sdk
