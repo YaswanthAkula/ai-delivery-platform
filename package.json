@@ -10,6 +10,7 @@
     "check": "node --test test/*.test.mjs",
     "test": "node --test test/*.test.mjs",
     "start": "node src/server.mjs",
+    "worker": "node src/worker.mjs",
     "demo": "node src/demo.ts"
   }
 }
