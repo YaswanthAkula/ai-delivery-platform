@@ -6,7 +6,7 @@ The runtime server implements the existing delivery-runtime HTTP contract. It st
 
 Design jobs require a committed `.delivery/design.md` screen specification. Implementation jobs produce real local commits and integrated diffs. Review jobs run Codex read-only and record its findings. QA jobs execute operator-configured commands and record actual exit codes/output for each exact approved acceptance criterion. A review agent's opinion is not a substitute for acceptance tests.
 
-Release returns RELEASE_ADAPTER_MISSING: no deployment is attempted. CI/CD deployment, browser-specific tooling, automatic repair loops, GitHub publishing/PRs and a mobile UI remain to be added. Local design Markdown is a design specification, not proof of attractive rendered screens.
+Release connects to a separate trusted service for GitHub publishing/PRs and a configured CI/CD workflow (docs/github-release.md). Missing configuration still returns RELEASE_ADAPTER_MISSING. Hosting/provider workflows and credentials are not configured; no live deployment has been verified. Browser-specific tooling, automatic repair loops and a mobile UI remain to be added. Local design Markdown is a design specification, not proof of attractive rendered screens.
 
 ## Configure on a cloud runtime host
 
@@ -32,7 +32,7 @@ Run `npm run runtime` behind an authenticated HTTPS reverse proxy. Evidence endp
 
 ## Isolation and repository behavior
 
-The runtime creates a separate clone with `--no-hardlinks` and branch `delivery/<run-id>`. All jobs within one run use the same integration workspace; operations are serialized. The source repository stays unchanged. Changes are local only; nothing is pushed to GitHub yet.
+The runtime creates a separate clone with `--no-hardlinks` and branch `delivery/<run-id>`. All jobs within one run use the same integration workspace; operations are serialized. The source repository stays unchanged. Design/coding jobs make local commits. Only the release stage sends an exact tested-tree snapshot to the separate service for GitHub publishing; the coding process never receives GitHub write credentials.
 
 Git workspace separation is not an OS security boundary. Run this service in a dedicated, isolated Linux container/VM with a restricted filesystem/network and no production credentials. Git/test commands execute as that service user; acceptance commands are not sandboxed by Node. Never run it on a personal machine with sensitive files or share a runtime between untrusted tenants. Use separate release infrastructure for production credentials. The runtime needs access only to prepared application repositories, workspaces and protected Codex configuration.
 
@@ -44,7 +44,7 @@ Subprocesses use argument arrays with shell disabled. Their environment forwards
 
 Persist the runtime database AND workspace directory. One runtime process owns a database lock file. A second instance refuses startup. On graceful shutdown, it stops accepting work and waits for the current operation. Supervisors must terminate the entire process group/container on a forced shutdown.
 
-A crash can leave uncertain filesystem/external effects. Before clearing a stale `.sqlite.lock`, verify the previous process group is fully stopped. Restart marks previously running operations EXECUTION_INTERRUPTED and does not replay them or claim they completed. Queued operations survive. Partial/unrecorded or dirty workspaces block subsequent execution and require reconciliation. Automatic Codex-session recovery/reconciliation is future work; do not reset or discard generated work blindly.
+A crash can leave uncertain filesystem/external effects. Before clearing a stale `.sqlite.lock`, verify the previous process group is fully stopped. Restart marks interrupted coding/design/review/QA operations EXECUTION_INTERRUPTED and does not replay them or claim they completed. A release with a saved request key/remote ID is requeued and resumes that same idempotent remote release, provided its verified source commit has not changed. Other queued operations survive. Partial/unrecorded or dirty workspaces block subsequent execution and require reconciliation. Automatic Codex-session recovery/reconciliation is future work; do not reset or discard generated work blindly.
 
 ## Validation evidence
 

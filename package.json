@@ -12,6 +12,7 @@
     "start": "node src/server.mjs",
     "worker": "node src/worker.mjs",
     "runtime": "node src/runtime-server.mjs",
+    "release": "node src/release-server.mjs",
     "demo": "node src/demo.ts"
   }
 }
