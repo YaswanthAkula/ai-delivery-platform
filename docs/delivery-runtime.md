@@ -4,7 +4,7 @@
 
 Implemented: durable SQLite delivery runs/jobs, model-backed task decomposition, mandatory stage gates, dependency scheduling, leased background workers, checkpoint recovery, bounded dispatch/retry counts and an authenticated HTTP adapter for a separate coding runtime.
 
-The coding runtime server is now implemented (see docs/codex-runtime.md): allowlisted source repositories, separate Git clones/branches, Codex CLI invocation, persistent evidence and trusted acceptance commands. Codex installation/authentication, cloud hosting, browser-specific QA, automatic remediation and CI/CD release adapters remain unconfigured/unimplemented. The HTTP protocol below is our integration contract, not an OpenAI endpoint. Tests exercise the real service and temporary Git repositories with injected Codex responses; live model execution/deployment has not been verified.
+The coding runtime server is implemented (docs/codex-runtime.md): allowlisted source repositories, separate Git clones/branches, Codex CLI invocation, evidence and trusted acceptance commands. A separate GitHub/CI release service is also implemented (docs/github-release.md). Codex authentication, hosting/provider workflows and credentials remain unconfigured; browser-specific QA and automatic remediation remain unimplemented. The HTTP protocol below is our integration contract, not an OpenAI endpoint. Tests exercise real services and temporary Git repositories with injected Codex/GitHub/provider responses; live model execution/deployment has not been verified.
 
 ## Start and observe delivery
 
@@ -84,7 +84,7 @@ Every URL must be HTTPS. Runtime evidence artifacts must be stored persistently,
 
 ## Next runtime implementation
 
-Deploy/configure the implemented runtime service using an isolated host (docs/codex-runtime.md). Verify live Codex access, add GitHub publishing, automatic repair, browser tooling and a separate CI/CD release adapter. The current service returns RELEASE_ADAPTER_MISSING rather than attempting deployment.
+Deploy/configure the implemented runtime and separate release service (docs/codex-runtime.md, docs/github-release.md). Verify live Codex/GitHub access, prepare a real provider workflow, then add automatic repair and browser tooling. Without release configuration the runtime returns RELEASE_ADAPTER_MISSING.
 
 Official references:
 - https://learn.chatgpt.com/docs/codex-sdk

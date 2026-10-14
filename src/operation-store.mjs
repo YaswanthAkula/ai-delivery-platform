@@ -19,6 +19,7 @@ export class OperationStore {
       CREATE TABLE IF NOT EXISTS runtime_operations (id TEXT PRIMARY KEY, request_key TEXT UNIQUE NOT NULL, request_hash TEXT NOT NULL, request TEXT NOT NULL,
       run_id TEXT NOT NULL REFERENCES runtime_runs(id), status TEXT NOT NULL DEFAULT 'queued', result TEXT, error_code TEXT, artifact TEXT,
       created_at TEXT NOT NULL);`);
+    if (!this.db.prepare('PRAGMA table_info(runtime_operations)').all().some(column => column.name === 'checkpoint')) this.db.exec('ALTER TABLE runtime_operations ADD COLUMN checkpoint TEXT');
   }
   submit(requestKey, value) {
     requireText(requestKey, 'Idempotency-Key', 200);
@@ -39,7 +40,7 @@ export class OperationStore {
   get(id) {
     const row = this.db.prepare('SELECT * FROM runtime_operations WHERE id=?').get(id);
     if (!row) throw new AppError(404, 'OPERATION_NOT_FOUND', 'Operation not found');
-    return { ...row, request: JSON.parse(row.request), result: row.result ? JSON.parse(row.result) : null };
+    return { ...row, request: JSON.parse(row.request), result: row.result ? JSON.parse(row.result) : null, checkpoint: row.checkpoint ? JSON.parse(row.checkpoint) : null };
   }
   claim() {
     return this.memory.transaction(() => {
@@ -52,6 +53,14 @@ export class OperationStore {
   }
   workspace(runId) { return this.db.prepare('SELECT * FROM runtime_runs WHERE id=?').get(runId); }
   saveWorkspace(runId, path, baseSha) { this.db.prepare('UPDATE runtime_runs SET workspace=?,base_sha=? WHERE id=?').run(path, baseSha, runId); }
+  checkpoint(id, value) { this.db.prepare("UPDATE runtime_operations SET checkpoint=? WHERE id=? AND status='running'").run(JSON.stringify(value), id); }
+  releaseReady(runId, headSha, criteriaCount) {
+    const operations = this.db.prepare("SELECT id FROM runtime_operations WHERE run_id=? AND status='succeeded'").all(runId).map(row => this.get(row.id));
+    const atHead = operation => operation.artifact && JSON.parse(operation.artifact).headAfter === headSha;
+    const review = operations.find(operation => operation.request.kind === 'review' && operation.result?.reviewPassed === true && atHead(operation));
+    const qa = operations.find(operation => operation.request.kind === 'qa' && atHead(operation) && new Set((operation.result?.acceptanceResults ?? []).filter(check => check.passed === true).map(check => check.index)).size === criteriaCount && (operation.result?.acceptanceResults ?? []).every(check => check.passed === true && Number.isInteger(check.index) && check.index >= 0 && check.index < criteriaCount));
+    if (!review || !qa) throw new AppError(409, 'RELEASE_GATES_MISSING', 'Passing review and acceptance checks are required for this exact local commit');
+  }
   complete(id, result, artifact) {
     this.db.prepare("UPDATE runtime_operations SET status='succeeded',result=?,artifact=? WHERE id=? AND status='running'").run(JSON.stringify(result), JSON.stringify(artifact), id);
   }
@@ -60,6 +69,11 @@ export class OperationStore {
   }
   recoverInterrupted() {
     // External effects may already have occurred. Never replay uncertain deployment/coding.
-    this.db.prepare("UPDATE runtime_operations SET status='failed',error_code='EXECUTION_INTERRUPTED' WHERE status='running'").run();
+    const running = this.db.prepare("SELECT id FROM runtime_operations WHERE status='running'").all();
+    for (const row of running) {
+      const operation = this.get(row.id);
+      if (operation.request.kind === 'release' && operation.checkpoint?.releaseRequestKey) this.db.prepare("UPDATE runtime_operations SET status='queued' WHERE id=?").run(row.id);
+      else this.db.prepare("UPDATE runtime_operations SET status='failed',error_code='EXECUTION_INTERRUPTED' WHERE id=?").run(row.id);
+    }
   }
 }

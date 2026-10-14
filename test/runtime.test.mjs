@@ -13,19 +13,20 @@ import { commandEnvironment, runCommand } from '../src/process.mjs';
 import { DeliveryStore } from '../src/delivery-store.mjs';
 import { DeliveryWorker } from '../src/worker.mjs';
 import { createRuntime } from '../src/runtime.mjs';
+import { validateSnapshot } from '../src/github-release.mjs';
 
 const spec = { title: 'Booking', goal: 'Book appointments', users: ['Receptionist'], inScope: ['Booking'], outOfScope: ['Billing'], acceptanceCriteria: ['A booking returns a confirmation ID'], assumptions: [], openQuestions: [] };
 function request(kind = 'design', runId = randomUUID()) {
   return { runId, jobId: randomUUID(), repository: 'owner/app', specificationVersion: 1, kind, payload: { specification: spec, instructions: 'Implement the approved scope' }, dependencies: [] };
 }
-async function fixture(t, { codex, acceptanceChecks } = {}) {
+async function fixture(t, { codex, acceptanceChecks, release } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'runtime-execution-')); const source = join(root, 'source'); mkdirSync(source);
   const git = async (...args) => { const result = await runCommand(['git', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: source }); assert.equal(result.code, 0, result.stderr); return result.stdout.trim(); };
   await git('init'); await git('config', 'user.name', 'Runtime Test'); await git('config', 'user.email', 'test@localhost');
   writeFileSync(join(source, 'README.md'), 'Initial application\n'); await git('add', '.'); await git('commit', '-m', 'Initial');
   const memory = new Memory(join(root, 'runtime.sqlite')); const store = new OperationStore(memory);
   const repositories = { 'owner/app': { path: source, ...(acceptanceChecks ? { acceptanceChecks } : {}) } };
-  const executor = new CodexExecutor({ store, repositories, workspaceRoot: join(root, 'workspaces'), publicUrl: 'https://runtime.example', codex });
+  const executor = new CodexExecutor({ store, repositories, workspaceRoot: join(root, 'workspaces'), publicUrl: 'https://runtime.example', codex, release });
   const worker = new RuntimeWorker({ store, executor });
   t.after(() => { memory.close(); rmSync(root, { recursive: true, force: true }); });
   return { root, source, memory, store, executor, worker, repositories, git };
@@ -159,4 +160,38 @@ test('delivery worker integrates through runtime HTTP service to real commits an
   assert.equal(completed.jobs.find(job => job.kind === 'qa').result.acceptanceResults[0].passed, true);
   assert.equal(completed.status, 'blocked'); assert.equal(completed.jobs.at(-1).error_code, 'RELEASE_ADAPTER_MISSING');
   assert.notEqual(memory.project(project.id).stage, 'delivered');
+});
+test('runtime sends a verified real Git snapshot including binary blobs to the release service', async t => {
+  const bytes = Buffer.from([0, 255, 254, 13, 10, 128]); let submitted;
+  const releaseId = randomUUID();
+  const release = { async start(value, key) { submitted = validateSnapshot(value); assert.match(key, /^[a-f0-9-]{36}$/); return releaseId; }, async wait(id) { assert.equal(id, releaseId); return { evidenceUrl: 'https://release.example/evidence', smokeEvidenceUrl: 'https://release.example/smoke', deployedUrl: 'https://app.example', smokePassed: true, publishedCommitSha: 'd'.repeat(40) }; } };
+  const codex = async ({ cwd, kind }) => {
+    if (kind === 'design') { mkdirSync(join(cwd, '.delivery')); writeFileSync(join(cwd, '.delivery/design.md'), '# Design\n'); }
+    if (kind === 'implementation') writeFileSync(join(cwd, 'asset.bin'), bytes);
+    return { summary: 'Done', blocked: false, reviewPassed: kind === 'review' };
+  };
+  const { store, worker } = await fixture(t, { codex, release, acceptanceChecks: [{ criterion: spec.acceptanceCriteria[0], argv: [process.execPath, '-e', 'process.exit(0)'] }] });
+  const runId = randomUUID(); let operation;
+  for (const kind of ['design', 'implementation', 'review', 'qa', 'release']) { operation = store.submit(`${kind}:1`, request(kind, runId)); await worker.tick(); assert.equal(store.get(operation.id).status, 'succeeded'); }
+  const binary = submitted.tree.find(entry => entry.path === 'asset.bin');
+  assert.deepEqual(Buffer.from(submitted.blobs.find(blob => blob.sha === binary.sha).content, 'base64'), bytes);
+  assert.equal(store.get(operation.id).checkpoint.releaseId, releaseId);
+  assert.equal(store.get(operation.id).result.smokePassed, true);
+});
+test('interrupted release resumes the persisted remote ID without a duplicate submission', async t => {
+  let starts = 0, waits = 0; const releaseId = randomUUID();
+  const release = { async start() { starts++; return releaseId; }, async wait() { if (++waits === 1) throw new Error('simulated runtime interruption'); return { evidenceUrl: 'https://release.example/evidence', smokeEvidenceUrl: 'https://release.example/smoke', deployedUrl: 'https://app.example', smokePassed: true }; } };
+  const { store, executor } = await fixture(t, { release }); const runId = randomUUID();
+  const operation = store.submit('release:1', request('release', runId)); const claimed = store.claim();
+  const workspace = await executor.workspace(claimed.request); const head = await executor.git(workspace.path, ['rev-parse', 'HEAD']);
+  for (const kind of ['review', 'qa']) {
+    const gate = store.submit(`${kind}:1`, request(kind, runId));
+    store.db.prepare("UPDATE runtime_operations SET status='running' WHERE id=?").run(gate.id);
+    store.complete(gate.id, kind === 'review' ? { reviewPassed: true } : { acceptanceResults: [{ index: 0, passed: true }] }, { headAfter: head });
+  }
+  await assert.rejects(() => executor.execute(claimed));
+  assert.equal(store.get(operation.id).checkpoint.releaseId, releaseId);
+  store.recoverInterrupted(); const resumed = store.claim(); assert.equal(resumed.id, operation.id);
+  const completed = await executor.execute(resumed); store.complete(resumed.id, completed.result, completed.artifact);
+  assert.equal(store.get(operation.id).status, 'succeeded'); assert.equal(starts, 1);
 });

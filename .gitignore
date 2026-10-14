@@ -11,3 +11,5 @@ data/
 runtime-data/
 *.sqlite.lock
 runtime-repositories.json
+release-data/
+release-repositories.json

@@ -3,6 +3,7 @@ import { join, resolve, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppError } from './memory.mjs';
 import { commandEnvironment, runCommand } from './process.mjs';
+import { validateEvidence } from './runtime.mjs';
 
 const outputSchema = {
   type: 'object', additionalProperties: false,
@@ -42,9 +43,9 @@ Return JSON matching the output schema.\n${JSON.stringify({ specification, instr
 }
 
 export class CodexExecutor {
-  constructor({ store, repositories, workspaceRoot, publicUrl, codex = createCodexRunner(), command = runCommand }) {
+  constructor({ store, repositories, workspaceRoot, publicUrl, codex = createCodexRunner(), command = runCommand, release }) {
     this.store = store; this.repositories = repositories; this.workspaceRoot = resolve(workspaceRoot);
-    this.codex = codex; this.command = command;
+    this.codex = codex; this.command = command; this.release = release;
     const url = new URL(publicUrl);
     if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('RUNTIME_PUBLIC_URL must be HTTPS without embedded credentials');
     this.publicUrl = url.toString().replace(/\/$/, '');
@@ -78,6 +79,24 @@ export class CodexExecutor {
     await this.git(path, ['checkout', '-b', `delivery/${request.runId}`, baseSha]);
     this.store.saveWorkspace(request.runId, path, baseSha);
     return { path, baseSha, config };
+  }
+  async snapshot(path, baseSha, sourceSha, request) {
+    const entries = async sha => (await this.git(path, ['ls-tree', '-rz', sha])).split('\0').filter(Boolean).map(line => {
+      const match = line.match(/^(\d+) (\w+) ([a-f0-9]{40})\t([\s\S]+)$/);
+      if (!match) throw new AppError(409, 'UNSUPPORTED_GIT_TREE', 'Unsupported Git tree entry');
+      return { mode: match[1], type: match[2], sha: match[3], path: match[4] };
+    });
+    const tree = await entries(sourceSha); const known = new Set((await entries(baseSha)).map(entry => entry.sha));
+    const blobs = []; let bytes = 0;
+    for (const entry of tree) {
+      if (entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) throw new AppError(409, 'UNSUPPORTED_GIT_TREE', 'Release snapshots currently support regular/executable files only');
+      if (known.has(entry.sha)) continue;
+      const result = await this.command(['git', '-c', 'core.hooksPath=/dev/null', 'cat-file', 'blob', entry.sha], { cwd: path, env: commandEnvironment(), binary: true, maxBytes: 4000000 });
+      if (result.code !== 0 || !Buffer.isBuffer(result.stdout)) throw new AppError(502, 'GIT_FAILED', 'Cannot read source Git object');
+      bytes += result.stdout.length; if (bytes > 8000000) throw new AppError(409, 'SNAPSHOT_LIMIT', 'Release snapshot exceeds changed-blob size limit');
+      blobs.push({ sha: entry.sha, content: result.stdout.toString('base64') }); known.add(entry.sha);
+    }
+    return { runId: request.runId, repository: request.repository, baseSha, sourceSha, treeSha: await this.git(path, ['rev-parse', `${sourceSha}^{tree}`]), tree, blobs };
   }
   async execute(operation) {
     const request = operation.request;
@@ -117,8 +136,19 @@ export class CodexExecutor {
       }
       if (await this.git(path, ['rev-parse', 'HEAD']) !== headBefore || await this.git(path, ['status', '--porcelain'])) throw new AppError(409, 'QA_MODIFIED_CODE', 'Acceptance checks must not modify tracked application code');
     } else {
-      // Release remains deliberately unavailable until a separate trusted CI adapter is configured.
-      throw new AppError(503, 'RELEASE_ADAPTER_MISSING', 'A CI/CD release adapter is required; no deployment was attempted');
+      if (!this.release) throw new AppError(503, 'RELEASE_ADAPTER_MISSING', 'Configure the separate trusted release service; no deployment was attempted');
+      this.store.releaseReady(request.runId, headBefore, request.payload.specification.acceptanceCriteria.length);
+      let checkpoint = operation.checkpoint;
+      if (checkpoint?.sourceSha && checkpoint.sourceSha !== headBefore) throw new AppError(409, 'RELEASE_SOURCE_CHANGED', 'Release checkpoint source differs from the verified workspace');
+      if (!checkpoint) { checkpoint = { releaseRequestKey: operation.id, sourceSha: headBefore }; this.store.checkpoint(operation.id, checkpoint); }
+      if (!checkpoint.releaseId) {
+        const snapshot = await this.snapshot(path, baseSha, headBefore, request);
+        const releaseId = await this.release.start(snapshot, checkpoint.releaseRequestKey);
+        checkpoint = { ...checkpoint, releaseId }; this.store.checkpoint(operation.id, checkpoint);
+      }
+      const released = await this.release.wait(checkpoint.releaseId);
+      validateEvidence('release', released, request.payload.specification.acceptanceCriteria.length);
+      artifact.release = released; result = { ...released, evidenceUrl: url };
     }
     artifact.headAfter = await this.git(path, ['rev-parse', 'HEAD']);
     return { result, artifact };

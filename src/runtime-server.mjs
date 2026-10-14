@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { Memory, AppError } from './memory.mjs';
 import { OperationStore } from './operation-store.mjs';
 import { CodexExecutor, createCodexRunner } from './codex-executor.mjs';
+import { createReleaseClient } from './release-client.mjs';
 
 async function readBody(req) {
   if ((req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase() !== 'application/json') throw new AppError(415, 'JSON_REQUIRED', 'Use application/json');
@@ -70,7 +71,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   let memory, server;
   try {
     memory = new Memory(databasePath); const store = new OperationStore(memory); store.recoverInterrupted();
-    const executor = new CodexExecutor({ store, repositories, workspaceRoot: process.env.RUNTIME_WORKSPACE_ROOT ?? './runtime-data/workspaces', publicUrl: process.env.RUNTIME_PUBLIC_URL, codex: createCodexRunner({ executable: process.env.CODEX_EXECUTABLE ?? 'codex', model: process.env.CODING_MODEL }) });
+    const release = process.env.RELEASE_SERVICE_URL && process.env.RELEASE_SERVICE_TOKEN ? createReleaseClient({ url: process.env.RELEASE_SERVICE_URL, token: process.env.RELEASE_SERVICE_TOKEN }) : undefined;
+    const executor = new CodexExecutor({ store, repositories, workspaceRoot: process.env.RUNTIME_WORKSPACE_ROOT ?? './runtime-data/workspaces', publicUrl: process.env.RUNTIME_PUBLIC_URL, codex: createCodexRunner({ executable: process.env.CODEX_EXECUTABLE ?? 'codex', model: process.env.CODING_MODEL }), release });
     server = createRuntimeApp({ store, repositories, token: process.env.CODING_RUNTIME_TOKEN });
     const worker = new RuntimeWorker({ store, executor });
     const port = Number(process.env.RUNTIME_PORT ?? 3100);

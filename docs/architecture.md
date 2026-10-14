@@ -3,7 +3,7 @@
 Discuss an idea with the owner, freeze an approved specification, then execute design, implementation, review, testing and deployment. Support multiple projects with separate repositories and execution environments.
 
 ## Current status
-The platform has a dependency-free Node.js planning API with SQLite project memory, a Responses API planner adapter, versioned drafts and explicit approval gates. Delivery runs support manager task decomposition, leased workers, dependency scheduling and remote checkpoints. The coding runtime service implements Codex CLI execution in separate Git clones/branches, design/coding/review artifacts and command-backed QA. Model authentication/cloud hosting are not configured; application deployment is not implemented. The TypeScript workflow demo remains illustrative. See docs/planning-api.md, docs/delivery-runtime.md and docs/codex-runtime.md for setup and limits.
+The platform has a dependency-free Node.js planning API with SQLite memory, a Responses API planner, versioned drafts and explicit approval. Delivery runs support task decomposition, leased workers, scheduling and checkpoints. The Codex execution service provides separate Git clones, design/coding/review artifacts and command-backed QA. A separate trusted release service publishes exact source trees to GitHub branches/PRs, dispatches a configured workflow and verifies pipeline/deployment/live-version evidence. Model authentication, cloud hosting, GitHub credentials and provider workflows are not configured; no live application has been deployed. See docs/planning-api.md, docs/delivery-runtime.md, docs/codex-runtime.md and docs/github-release.md.
 
 ## Roles
 Planner: gather requirements, assumptions, exceptions and acceptance criteria.
@@ -35,6 +35,6 @@ Evidence must come from tools/CI; the workflow demo's booleans are illustrative,
 1. Deploy/configure the planning backend and verify live model access.
 2. PostgreSQL migration, durable model jobs, idempotency and spending reservations.
 3. Configure and verify manager model access; add automatic remediation and runtime usage accounting.
-4. Deploy/configure the coding runtime service and add GitHub publishing/PR integration.
+4. Deploy/configure the coding runtime and separate GitHub release service.
 5. Design/review/browser QA tools.
-6. CI/CD release adapter and mobile ChatGPT integration.
+6. Configure a real hosting-provider CI/CD workflow and add mobile ChatGPT integration.

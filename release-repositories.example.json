@@ -1,0 +1,10 @@
+{
+  "owner/application-repo": {
+    "baseBranch": "main",
+    "workflow": "delivery.yml",
+    "workflowBlobSha": "0000000000000000000000000000000000000000",
+    "environment": "preview",
+    "allowedDeploymentOrigins": ["https://application-preview.example.com"],
+    "smokePath": "/.well-known/delivery.json"
+  }
+}

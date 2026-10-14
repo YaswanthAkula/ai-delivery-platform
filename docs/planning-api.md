@@ -3,7 +3,7 @@
 ## Status and startup
 
 Implemented: single-owner authenticated HTTP API, SQLite project memory, versioned drafts, explicit approval, Responses API planner adapter and token usage records.
-Public mobile UI/ChatGPT integration and application deployment remain unimplemented. A delivery manager, scheduler and Codex CLI execution service are available; see docs/delivery-runtime.md and docs/codex-runtime.md. Live model authentication/cloud hosting remain unconfigured. Approval marks a project ready; delivery enqueue is a separate API operation and requires a configured runtime for actual execution.
+Public mobile UI/ChatGPT integration remains unimplemented. A delivery manager, scheduler, Codex CLI execution service and separate GitHub/CI release service are available (docs/delivery-runtime.md, docs/codex-runtime.md, docs/github-release.md). Model authentication, cloud hosting and provider workflows remain unconfigured; no live deployment has occurred. Approval marks a project ready; delivery enqueue is a separate API operation and requires configured execution/release services.
 
 Requires Node.js 24+. There are no npm dependencies. Set APP_AUTH_TOKEN (a random secret of at least 32 characters), OPENAI_API_KEY and PLANNER_MODEL in backend secrets. Do not paste secrets into chat or commit them. The model must support the Responses API and be available to the account; no model is silently substituted.
 
